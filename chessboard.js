@@ -1674,10 +1674,12 @@ var Board = function(width, light_square, dark_square, select_color) {
   }
   
   // pick piece
-function drag_piece(event, square) {
-  user_source = square;
-  event.dataTransfer.setData("text", square);
+  function drag_piece(event, square) {
+    if (!is_square_on_board(square)) return; // Ignora si la casilla está fuera del tablero
+    user_source = square;
+    event.dataTransfer.setData("text", square);
 }
+
 
 function drag_over(event, square) {
   event.preventDefault();
@@ -1687,6 +1689,7 @@ function drag_over(event, square) {
 }
 
 function drop_piece(event, square) {
+  if (!is_square_on_board(square)) return; // Ignora si la casilla está fuera del tablero
   user_target = square;
   var moveResult = move_piece(square);
 
@@ -1707,9 +1710,12 @@ function drop_piece(event, square) {
   event.preventDefault();
 }
 
+
 function tap_piece(square) {
   draw_board();
   update_board();
+
+  if (!is_square_on_board(square)) return; // Ignora si la casilla está fuera del tablero
 
   if (board[square] && !isMoveInProgress()) {
       document.getElementById(square).style.backgroundColor = SELECT_COLOR;
@@ -1726,6 +1732,10 @@ function tap_piece(square) {
 
       if (moveResult === true) {
           document.getElementById(square).style.backgroundColor = "green";
+          if (levels[currentLevel].autoMoveBlack && currentMoveIndex % 2 === 1) {
+              var blackMoveIndex = Math.floor((currentMoveIndex - 1) / 2);
+              setTimeout(auto_move_black, 500, levels[currentLevel].autoMoveBlack[blackMoveIndex]);
+          }
       } else if (moveResult === "complete") {
           document.getElementById(square).style.backgroundColor = "green";
           setTimeout(() => {
@@ -1749,33 +1759,32 @@ function isMoveInProgress() {
 }
 
 function move_piece(square) {
+  if (!is_square_on_board(user_source) || !is_square_on_board(user_target)) {
+      return false; // Movimiento fuera del tablero
+  }
+
   var move_str = coordinates[user_source] + coordinates[user_target];
-  // Validar si el movimiento es parte de la secuencia correcta
   var isCorrectMove = move_str === correctMoves[currentMoveIndex];
-  // Comprobar si el movimiento es válido en las reglas de ajedrez
-  var valid_move = is_valid(move_str); // Comprobación de movimiento válido
+  var valid_move = is_valid(move_str);
 
   if (valid_move && isCorrectMove) {
-      // Es un movimiento correcto
       if (move_stack.count == 0) push_move(valid_move);
-      make_move(valid_move, all_moves); // Realiza el movimiento solo si es válido y correcto
-      push_move(valid_move); // Agrega el movimiento a la lista de movimientos
-      update_board(); // Actualiza el tablero visualmente
-      currentMoveIndex++; // Avanza al siguiente movimiento en la secuencia
+      make_move(valid_move, all_moves);
+      push_move(valid_move);
+      update_board();
+      currentMoveIndex++;
 
-      // Si es el último movimiento correcto del nivel, pintar de verde
       if (currentMoveIndex >= correctMoves.length) {
           setTimeout(() => {
-              loadLevel(currentLevel + 1); // Cargar siguiente nivel
-          }, 1000); // Espera de 1 segundo antes de pasar al siguiente nivel
-          return "complete"; // Indica que el nivel se ha completado
+              loadLevel(currentLevel + 1);
+          }, 1000);
+          return "complete";
       } else if (levels[currentLevel].autoMoveBlack && currentMoveIndex % 2 === 1) {
           var blackMoveIndex = Math.floor((currentMoveIndex - 1) / 2);
           setTimeout(auto_move_black, 500, levels[currentLevel].autoMoveBlack[blackMoveIndex]);
       }
-      return true; // Movimiento correcto
+      return true;
   } else {
-      // Movimiento incorrecto: no realizar el movimiento, solo retornar false
       return false;
   }
 }
@@ -1793,6 +1802,11 @@ function clear_highlight(square) {
   var element = document.getElementById(square);
   if (element) {
   }
+}
+
+
+function is_square_on_board(square) {
+  return (square & 0x88) == 0; // Verifica si la casilla está dentro del tablero
 }
 
 function auto_move_black(move_str) {
