@@ -1688,55 +1688,98 @@ function drag_over(event, square) {
 
 function drop_piece(event, square) {
   user_target = square;
-  move_piece(square);
-  console.log("Drop piece to: " + square);
+  var moveResult = move_piece(square);
+
+  if (moveResult === true) {
+      document.getElementById(square).style.backgroundColor = "green";
+  } else if (moveResult === "complete") {
+      document.getElementById(square).style.backgroundColor = "green";
+      setTimeout(() => {
+          loadLevel(currentLevel + 1);
+      }, 1000);
+  } else {
+      document.getElementById(square).style.backgroundColor = "red";
+      setTimeout(() => {
+          document.getElementById(square).style.backgroundColor = "";
+          update_board();
+      }, 1000);
+  }
   event.preventDefault();
 }
 
 function tap_piece(square) {
   draw_board();
   update_board();
+
+  if (board[square] && !isMoveInProgress()) {
+      document.getElementById(square).style.backgroundColor = SELECT_COLOR;
+  }
+
   var click_square = parseInt(square, 10);
+
   if (!click_lock && board[click_square]) {
       user_source = click_square;
       click_lock ^= 1;
   } else if (click_lock) {
       user_target = click_square;
-      move_piece(square);
+      var moveResult = move_piece(square);
+
+      if (moveResult === true) {
+          document.getElementById(square).style.backgroundColor = "green";
+      } else if (moveResult === "complete") {
+          document.getElementById(square).style.backgroundColor = "green";
+          setTimeout(() => {
+              loadLevel(currentLevel + 1);
+          }, 1000);
+      } else {
+          document.getElementById(square).style.backgroundColor = "red";
+          setTimeout(() => {
+              document.getElementById(square).style.backgroundColor = "";
+              update_board();
+          }, 1000);
+      }
+      click_lock ^= 1;
   }
+}
+
+// Función para verificar si un movimiento de error o éxito está en progreso
+function isMoveInProgress() {
+  var color = document.getElementById(user_target).style.backgroundColor;
+  return color === "red" || color === "green";
 }
 
 function move_piece(square) {
   var move_str = coordinates[user_source] + coordinates[user_target];
+  // Validar si el movimiento es parte de la secuencia correcta
+  var isCorrectMove = move_str === correctMoves[currentMoveIndex];
+  // Comprobar si el movimiento es válido en las reglas de ajedrez
+  var valid_move = is_valid(move_str); // Comprobación de movimiento válido
 
+  if (valid_move && isCorrectMove) {
+      // Es un movimiento correcto
+      if (move_stack.count == 0) push_move(valid_move);
+      make_move(valid_move, all_moves); // Realiza el movimiento solo si es válido y correcto
+      push_move(valid_move); // Agrega el movimiento a la lista de movimientos
+      update_board(); // Actualiza el tablero visualmente
+      currentMoveIndex++; // Avanza al siguiente movimiento en la secuencia
 
-  if (move_str === correctMoves[currentMoveIndex]) {
-      var valid_move = is_valid(move_str);
-      if (valid_move) {
-          if (move_stack.count === 0) push_move(valid_move);
-          make_move(valid_move, all_moves);
-          push_move(valid_move);
-          update_board();
-          currentMoveIndex++; // Avanzar al siguiente movimiento
-
-          if (currentMoveIndex >= correctMoves.length) {
-              setTimeout(() => {
-                  loadLevel(currentLevel + 1); // Cargar siguiente nivel
-              }, 1000); // Espera de 1 segundo antes de pasar al siguiente nivel
-          } else if (levels[currentLevel].autoMoveBlack && currentMoveIndex % 2 === 1) {
-              var blackMoveIndex = Math.floor((currentMoveIndex - 1) / 2);
-              setTimeout(auto_move_black, 500, levels[currentLevel].autoMoveBlack[blackMoveIndex]);
-          }
+      // Si es el último movimiento correcto del nivel, pintar de verde
+      if (currentMoveIndex >= correctMoves.length) {
+          setTimeout(() => {
+              loadLevel(currentLevel + 1); // Cargar siguiente nivel
+          }, 1000); // Espera de 1 segundo antes de pasar al siguiente nivel
+          return "complete"; // Indica que el nivel se ha completado
+      } else if (levels[currentLevel].autoMoveBlack && currentMoveIndex % 2 === 1) {
+          var blackMoveIndex = Math.floor((currentMoveIndex - 1) / 2);
+          setTimeout(auto_move_black, 500, levels[currentLevel].autoMoveBlack[blackMoveIndex]);
       }
+      return true; // Movimiento correcto
   } else {
-      setTimeout(() => {
-          clear_highlight(user_target); // Limpiar después de un breve retraso
-      }, 1000);
+      // Movimiento incorrecto: no realizar el movimiento, solo retornar false
+      return false;
   }
-  draw_board();
-  update_board();
-  click_lock = 0;
 }
+
 
 // Función para resaltar casilla sin lógica de colores
 function highlight_square(square, color) {
@@ -1754,15 +1797,13 @@ function clear_highlight(square) {
 
 function auto_move_black(move_str) {
   var valid_move = is_valid(move_str);
-
   if (valid_move) {
       make_move(valid_move, all_moves);
       push_move(valid_move);
       update_board();
-      currentMoveIndex++; // Avanzar el índice para el siguiente movimiento
+      currentMoveIndex++;
   }
 }
-
 
 var levels = [
   {
@@ -1781,9 +1822,12 @@ var currentMoveIndex = 0; // Índice del movimiento actual
 
 function loadLevel(levelIndex) {
   var levelMessageElement = document.getElementById('levelMessage');
-  
+
   if (levelIndex >= levels.length) {
-      levelMessageElement.innerText = "¡Felicidades! Has completado todos los niveles.";
+      levelMessageElement.innerText = "¡Felicidades! Has completado el nivel.";
+      setTimeout(() => {
+        levelMessageElement.innerText = ""; // Limpia el mensaje después de un breve periodo
+    }, 2000);
       return;
   }
 
@@ -1794,8 +1838,6 @@ function loadLevel(levelIndex) {
   set_fen(level.fen); // Establecer la posición inicial
   update_board(); // Actualizar el tablero
 
-  // Mostrar mensaje de nivel superado
-  levelMessageElement.innerText = "¡Nivel " + (levelIndex) + " superado!";
 }
 
 
